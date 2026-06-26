@@ -1,0 +1,12 @@
+{
+  "name": "provenance-pay-setup",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix app run dev:all",
+    "register-secret": "npx tsx --env-file=.env register-entity-secret.ts"
+  },
+  "dependencies": {
+    "@circle-fin/developer-controlled-wallets": "^10.7.1",
+    "viem": "^2.53.1"
+  }
+}

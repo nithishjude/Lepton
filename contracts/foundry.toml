@@ -1,0 +1,10 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+
+[rpc_endpoints]
+arc_testnet = "https://rpc.testnet.arc.network"
+
+[etherscan]
+arc_testnet = { key = "no_key_needed", url = "https://testnet.arcscan.app" }

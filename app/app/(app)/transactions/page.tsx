@@ -57,7 +57,7 @@ export default function TransactionsPage() {
             {tx.wallet_address ? ` (${tx.wallet_address.slice(0, 6)}…${tx.wallet_address.slice(-4)})` : ''}
           </span>
           <span className="text-[11px] text-[var(--text-muted)] font-mono truncate max-w-[180px]" title={tx.nanopay_ref}>
-            {tx.nanopay_ref?.startsWith('simulated') ? 'local-ref' : tx.nanopay_ref?.slice(0, 16)}…
+            {tx.nanopay_ref ? tx.nanopay_ref.slice(0, 16) : 'n/a'}…
           </span>
           <span className="text-[12px] font-medium text-[var(--text-primary)] whitespace-nowrap">${parseFloat(tx.amount_usdc).toFixed(6)}</span>
           <span className="text-[11px] text-[var(--text-muted)] min-w-[44px] text-right">{relTime(tx.tick_at)}</span>

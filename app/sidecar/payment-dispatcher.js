@@ -10,6 +10,24 @@ const client = initiateDeveloperControlledWalletsClient({
 export class PaymentDispatcher {
   constructor(platformWalletId) {
     this.platformWalletId = platformWalletId;
+    this.usdcTokenId = null;
+  }
+
+  async getUsdcTokenId() {
+    if (this.usdcTokenId) return this.usdcTokenId;
+    try {
+      const balRes = await client.getWalletTokenBalance({ id: this.platformWalletId });
+      const usdc = balRes.data?.tokenBalances?.find(t => t.token?.symbol === 'USDC');
+      if (usdc && usdc.token?.id) {
+        this.usdcTokenId = usdc.token.id;
+        console.log(`[Nanopay] Dynamically resolved USDC token ID: ${this.usdcTokenId}`);
+        return this.usdcTokenId;
+      }
+    } catch (e) {
+      console.warn(`[Nanopay] Failed to dynamically resolve USDC token ID:`, e.message);
+    }
+    // Fall back to standard testnet USDC token ID
+    return '80938db6-599c-50bc-b6dc-d3ce724d2d48';
   }
 
   async dispatchTick(graph, trackRatePerSecond) {
@@ -17,6 +35,13 @@ export class PaymentDispatcher {
     const totalTickAmount = trackRatePerSecond * tickDuration;
 
     const confirmations = [];
+    let tokenId;
+    try {
+      tokenId = await this.getUsdcTokenId();
+    } catch (tokenErr) {
+      console.error('[Nanopay] Failed to get token ID:', tokenErr.message);
+      return confirmations;
+    }
 
     // Process payments
     for (const split of graph.splits) {
@@ -35,39 +60,34 @@ export class PaymentDispatcher {
         // We use the Platform wallet as the sender.
         const reqBody = {
           walletId: this.platformWalletId,
-          tokenId: '80938db6-599c-50bc-b6dc-d3ce724d2d48', // testnet USDC token ID (assuming standard or we could dynamically query)
+          tokenId: tokenId,
           destinationAddress: split.walletAddress,
           amounts: [amountUsdcStr],
           fee: { type: 'level', config: { feeLevel: 'LOW' } }
         };
 
-        // Note: For hackathon safety, we wrap this in a try/catch so if the API fails or rate limits,
-        // it doesn't crash the server. In a true production app, we would use batching here.
-        let txId = `simulated-${Date.now()}`;
-        try {
-          const txRes = await client.createTransaction(reqBody);
-          if (txRes.data && txRes.data.id) {
-            txId = txRes.data.id;
-          }
-        } catch (apiError) {
-          console.error(`[Nanopay] Circle API Error for ${split.mbid}:`, apiError.response?.data || apiError.message);
-          // Fall back to storing the attempt so we don't lose the record if rate limited during demo
+        const txRes = await client.createTransaction(reqBody);
+        if (txRes.data && txRes.data.id) {
+          const txId = txRes.data.id;
+          
+          db.prepare(`
+            INSERT INTO payment_ticks (id, track_mbid, contributor_mbid, amount_usdc, nanopay_ref)
+            VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?)
+          `).run(graph.mbid, split.mbid, amountUsdcStr, txId);
+
+          confirmations.push({
+            contributorMbid: split.mbid,
+            amount: amountUsdcStr,
+            txRef: txId,
+            status: 'confirmed'
+          });
+          
+          console.log(`[Nanopay] Successfully paid ${amountUsdcStr} USDC to ${split.name} (tx: ${txId})`);
+        } else {
+          console.error(`[Nanopay] Circle API did not return a transaction ID for ${split.name}`);
         }
-
-        db.prepare(`
-          INSERT INTO payment_ticks (id, track_mbid, contributor_mbid, amount_usdc, nanopay_ref)
-          VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?)
-        `).run(graph.mbid, split.mbid, amountUsdcStr, txId);
-
-        confirmations.push({
-          contributorMbid: split.mbid,
-          amount: amountUsdcStr,
-          txRef: txId,
-          status: 'confirmed'
-        });
-
       } catch (err) {
-        console.error(`[Nanopay] Failed to dispatch tick to ${split.mbid}:`, err.message);
+        console.error(`[Nanopay] Failed to dispatch tick to ${split.name} (${split.mbid}):`, err.response?.data || err.message);
       }
     }
 

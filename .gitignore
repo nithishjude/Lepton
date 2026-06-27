@@ -41,3 +41,15 @@ yarn-error.log*
 # System Files
 .DS_Store
 Thumbs.db
+
+# Temporary dev/research files
+extracted_landing.txt
+solana_reference.html.txt
+user_inputs.txt
+provenance_pay_full_app.html
+install-foundry.ps1
+foundryup-install.ps1
+find-foundry.ps1
+
+# TypeScript build cache
+app/tsconfig.tsbuildinfo

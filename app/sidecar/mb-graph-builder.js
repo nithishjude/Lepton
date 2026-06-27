@@ -64,7 +64,11 @@ export async function buildProvenanceGraph(mbid) {
 
   const splits = computeSplits(uniqueNodes);
 
-  const graph = { mbid, nodes: uniqueNodes, edges, splits };
+  // Capture real title from MusicBrainz response
+  const realTitle = data.title || null;
+  const primaryArtist = uniqueNodes.find(n => n.role === 'artist')?.name || null;
+
+  const graph = { mbid, title: realTitle, artist: primaryArtist, nodes: uniqueNodes, edges, splits };
   
   db.prepare('INSERT OR IGNORE INTO provenance_graphs (mbid, graph_json) VALUES (?, ?)').run(mbid, JSON.stringify(graph));
   

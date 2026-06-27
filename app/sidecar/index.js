@@ -11,16 +11,23 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const paymentEventBus = new EventEmitter();
-const dispatcher = new PaymentDispatcher(process.env.PLATFORM_WALLET_ADDRESS);
+const dispatcher = new PaymentDispatcher(process.env.PLATFORM_WALLET_ID || process.env.PLATFORM_WALLET_ADDRESS);
 
 // State
 let activeTimers = {};
 let activeIntervals = {};
 let currentGraph = null;
 
-// The simulated "play-gate" threshold in milliseconds
-const PLAY_GATE_MS = 15000;
-const TRACK_RATE_PER_SECOND = 0.0001; // $0.0001 USDC per second
+// Runtime-configurable settings (can be updated via POST /api/config)
+let sidecarConfig = {
+  playGateMs: 15000,           // ms before payments start after play
+  trackRatePerSecond: 0.0001,  // USDC per second of playback
+  batchIntervalMs: 2000,       // payment dispatch interval in ms
+  autoProvisionWallets: true,  // auto-create Circle wallets for unknown artists
+  beetsMetadataSync: true,     // read Beets MBID tags
+  musicbrainzLookup: true,     // query MusicBrainz REST API
+  x402StreamGating: true,      // x402 gating on stream endpoints
+};
 
 app.post('/webhook', async (req, res) => {
   const { event, trackId, mbid } = req.body;
@@ -37,26 +44,27 @@ app.post('/webhook', async (req, res) => {
     // 2. Fetch/Build Graph
     try {
       currentGraph = await buildProvenanceGraph(trackMbid);
+      currentGraph.trackMbid = trackMbid; // tag so SSE can match late subscribers
       paymentEventBus.emit('graph_ready', { trackId: trackMbid, graph: currentGraph });
     } catch (e) {
       console.error('Failed to build graph:', e.message);
       return res.status(500).send('Graph Error');
     }
 
-    // 3. Start 15s play-gate timer
+    // 3. Start play-gate timer (duration controlled by sidecarConfig.playGateMs)
     activeTimers[trackMbid] = setTimeout(() => {
       console.log(`[Play-Gate] Cleared for ${trackMbid}. Starting payment loop...`);
       paymentEventBus.emit('gate_cleared', { trackId: trackMbid });
       
-      // Dispatch tick every 2 seconds
+      // Dispatch tick at configurable interval
       activeIntervals[trackMbid] = setInterval(async () => {
-        const confirmations = await dispatcher.dispatchTick(currentGraph, TRACK_RATE_PER_SECOND);
+        const confirmations = await dispatcher.dispatchTick(currentGraph, sidecarConfig.trackRatePerSecond);
         if (confirmations.length > 0) {
           paymentEventBus.emit('tick', { trackId: trackMbid, confirmations });
         }
-      }, 2000);
+      }, sidecarConfig.batchIntervalMs);
 
-    }, PLAY_GATE_MS);
+    }, sidecarConfig.playGateMs);
   }
 
   if (event === 'skip' || event === 'stop') {
@@ -98,6 +106,11 @@ app.get('/api/payments/stream', (req, res) => {
   paymentEventBus.on('gate_cleared', onGate);
   paymentEventBus.on('stopped', onStop);
   paymentEventBus.on('graph_ready', onGraph);
+
+  // If graph already built for this track, push immediately to new subscriber (fixes race condition)
+  if (currentGraph && (currentGraph.trackMbid === trackId || currentGraph.mbid === trackId)) {
+    send({ type: 'graph_ready', graph: currentGraph });
+  }
 
   req.on('close', () => {
     paymentEventBus.off('tick', onTick);
@@ -159,6 +172,23 @@ app.get('/api/metrics', (req, res) => {
     escrowCount: escrowCount.count,
     trackCount: trackCount.count,
   });
+});
+
+// Config: GET current settings
+app.get('/api/config', (req, res) => {
+  res.json(sidecarConfig);
+});
+
+// Config: POST to update settings
+app.post('/api/config', (req, res) => {
+  const allowed = ['playGateMs','trackRatePerSecond','batchIntervalMs','autoProvisionWallets','beetsMetadataSync','musicbrainzLookup','x402StreamGating'];
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) {
+      sidecarConfig[key] = req.body[key];
+    }
+  }
+  console.log('[Config] Updated:', sidecarConfig);
+  res.json({ ok: true, config: sidecarConfig });
 });
 
 // Recent transactions

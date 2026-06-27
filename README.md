@@ -3,7 +3,6 @@
 > **"Every second a track plays, every hand that made it gets paid."**
 
 ---
-
 **Provenance Pay** is a Next.js application integrated with a Node.js sidecar agent that reads music credit metadata from files tagged via Beets/Picard/MusicBrainz, constructs a recursive provenance graph of every contributor to a track, and fires Circle Nanopayments (gas-free USDC on Arc Testnet) to each credited wallet simultaneously — in real time as a track plays.
 
 This project bridges existing music attribution standards (MusicBrainz artist credits) directly into a multi-recipient real-time payment rail. It utilizes the full Circle Agent Stack: Agent Wallets, Nanopayments (Circle Gateway), x402, Arc Testnet, Circle CLI, and smart contract templates (deployed on Arc Testnet).

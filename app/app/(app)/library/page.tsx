@@ -37,12 +37,12 @@ export default function LibraryPage() {
   const handleMbidPlay = async () => {
     const mbid = mbidInput.trim();
     if (!mbid) return;
-    // Fetch graph first to populate title/artist
+    // Fetch graph first to populate title/artist from real MusicBrainz data
     try {
       const res = await fetch(`${SIDECAR}/api/track/${mbid}/provenance`);
       const graph = await res.json();
-      const artist = graph.nodes?.find((n: any) => n.role === 'artist')?.name || 'Unknown';
-      const title = `Track ${mbid.slice(0, 8)}…`;
+      const artist = graph.nodes?.find((n: any) => n.role === 'artist')?.name || 'Unknown Artist';
+      const title = graph.title || `Track ${mbid.slice(0, 8)}…`;
       startTrack(mbid, title, artist);
       // Refresh library after a short delay
       setTimeout(fetchLibrary, 3000);

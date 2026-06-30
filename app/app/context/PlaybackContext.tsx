@@ -14,7 +14,7 @@ export interface PlaybackState {
 }
 
 interface PlaybackContextType extends PlaybackState {
-  startTrack: (mbid: string, title: string, artist: string) => Promise<void>;
+  startTrack: (mbid: string, title: string, artist: string, txHash?: string) => Promise<void>;
   stopTrack: () => Promise<void>;
 }
 
@@ -35,10 +35,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   const sseRef = useRef<EventSource | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopTrack = useCallback(async () => {
     if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     
     const mbid = state.trackMbid;
     if (mbid) {
@@ -51,10 +56,14 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     setState(s => ({ ...s, isPlaying: false, gateCleared: false, elapsedSeconds: 0 }));
   }, [state.trackMbid]);
 
-  const startTrack = useCallback(async (mbid: string, title: string, artist: string) => {
+  const startTrack = useCallback(async (mbid: string, title: string, artist: string, txHash?: string) => {
     // Stop existing
     if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
 
     setState({
       trackMbid: mbid,
@@ -67,6 +76,15 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       graph: null,
       contributors: {},
     });
+
+    // Start HTML5 Audio Playback
+    if (typeof window !== 'undefined') {
+      const audio = new Audio(`http://localhost:3001/api/stream/${mbid}?txHash=${txHash || ''}`);
+      audioRef.current = audio;
+      audio.play().catch(err => {
+        console.warn('[Playback] Audio play failed (using silent/simulated timer):', err.message);
+      });
+    }
 
     // Fire webhook
     await fetch('http://localhost:3001/webhook', {

@@ -204,6 +204,25 @@ export default function GraphPage() {
       .catch(() => setLoading(false));
   }, [trackMbid, activeGraph]);
 
+  // Auto-load most recent track graph if nothing is currently playing
+  useEffect(() => {
+    if (trackMbid || graph || manualGraph) return;
+    setLoading(true);
+    fetch('http://localhost:3001/api/library')
+      .then(r => r.json())
+      .then(tracks => {
+        if (tracks && tracks.length > 0) {
+          fetch(`http://localhost:3001/api/track/${tracks[0].mbid}/provenance`)
+            .then(r2 => r2.json())
+            .then(g => { setManualGraph(g); setLoading(false); })
+            .catch(() => setLoading(false));
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch(() => setLoading(false));
+  }, [trackMbid, graph, manualGraph]);
+
   // Reset manual graph when track changes
   useEffect(() => { setManualGraph(null); }, [trackMbid]);
 

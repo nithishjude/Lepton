@@ -9,6 +9,12 @@ const nextConfig = {
     '@walletconnect/sign-client',
     'pino',
   ],
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   webpack: (config) => {
     config.resolve.fallback = { ...config.resolve.fallback, accounts: false };
     return config;

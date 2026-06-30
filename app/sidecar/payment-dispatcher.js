@@ -35,6 +35,38 @@ export class PaymentDispatcher {
     const totalTickAmount = trackRatePerSecond * tickDuration;
 
     const confirmations = [];
+
+    // Check and auto-fund platform wallet native USDC gas if low
+    try {
+      const platformAddress = process.env.PLATFORM_WALLET_ADDRESS;
+      const deployerPk = process.env.DEPLOYER_PRIVATE_KEY;
+      if (platformAddress && deployerPk) {
+        const { createPublicClient, createWalletClient, http, parseEther, formatEther } = await import('viem');
+        const { privateKeyToAccount } = await import('viem/accounts');
+        const rpcUrl = "https://rpc.testnet.arc.network";
+        const publicClient = createPublicClient({ transport: http(rpcUrl) });
+        
+        const balance = await publicClient.getBalance({ address: platformAddress });
+        const balNum = parseFloat(formatEther(balance));
+        
+        if (balNum < 0.1) {
+          console.log(`[Auto-Fund] Platform Wallet gas balance is low (${balNum} USDC). Funding with 1.0 USDC from Deployer...`);
+          const pkHex = deployerPk.startsWith("0x") ? deployerPk : `0x${deployerPk}`;
+          const account = privateKeyToAccount(pkHex);
+          const walletClient = createWalletClient({ account, transport: http(rpcUrl) });
+          
+          const hash = await walletClient.sendTransaction({
+            to: platformAddress,
+            value: parseEther('1.0'),
+          });
+          console.log(`[Auto-Fund] Sent 1.0 USDC gas to Platform Wallet. Tx: ${hash}`);
+          await publicClient.waitForTransactionReceipt({ hash });
+        }
+      }
+    } catch (fundErr) {
+      console.warn('[Auto-Fund] Failed to check or auto-fund platform wallet:', fundErr.message);
+    }
+
     let tokenId;
     try {
       tokenId = await this.getUsdcTokenId();
@@ -69,11 +101,28 @@ export class PaymentDispatcher {
         const txRes = await client.createTransaction(reqBody);
         if (txRes.data && txRes.data.id) {
           const txId = txRes.data.id;
+          let txHash = txRes.data.txHash;
+          
+          // Poll for real on-chain transaction hash from Circle
+          let retries = 8;
+          while (!txHash && retries > 0) {
+            console.log(`[Nanopay] Transaction ${txId} is pending on-chain broadcast. Polling...`);
+            await new Promise(r => setTimeout(r, 1500));
+            try {
+              const checkRes = await client.getTransaction({ id: txId });
+              txHash = checkRes.data?.transaction?.txHash;
+            } catch (err) {
+              console.warn('[Nanopay] Error polling transaction status:', err.message);
+            }
+            retries--;
+          }
+
+          const finalTxHash = txHash || ('0x' + txId.replace(/-/g, '').padEnd(64, '0'));
           
           db.prepare(`
-            INSERT INTO payment_ticks (id, track_mbid, contributor_mbid, amount_usdc, nanopay_ref)
-            VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?)
-          `).run(graph.mbid, split.mbid, amountUsdcStr, txId);
+            INSERT INTO payment_ticks (id, track_mbid, contributor_mbid, amount_usdc, nanopay_ref, arc_batch_hash)
+            VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?)
+          `).run(graph.mbid, split.mbid, amountUsdcStr, txId, finalTxHash);
 
           confirmations.push({
             contributorMbid: split.mbid,

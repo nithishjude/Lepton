@@ -15,8 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const isBypass = typeof window !== 'undefined' && window.location.search.includes('bypass=true');
-    if (mounted && !isConnected && !isBypass) {
+    if (mounted && !isConnected) {
       router.push('/');
     }
   }, [mounted, isConnected, router]);
@@ -33,9 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Not connected — redirect is firing, show nothing
-  const isBypass = typeof window !== 'undefined' && window.location.search.includes('bypass=true');
-  if (!isConnected && !isBypass) return null;
+  if (!isConnected) return null;
 
   return (
     <PlaybackProvider>

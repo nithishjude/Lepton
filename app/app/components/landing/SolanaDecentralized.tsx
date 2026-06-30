@@ -35,7 +35,8 @@ export function SolanaDecentralized() {
           className="text-[20px] md:text-[24px] text-white/70 max-w-2xl mb-24"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, delay: 0.1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
         >
           Not only is Provenance Pay ultra-fast and low cost, it is completely trustless. Meaning, the registry remains open for independent artists to claim splits directly and streaming access will never be stopped.
         </motion.p>
@@ -46,7 +47,8 @@ export function SolanaDecentralized() {
             style={{ background: '#F85A9B' }}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, delay: 0.2 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
           >
             <h3 className="text-black text-[3rem] font-bold leading-tight">View Artists</h3>
           </motion.div>
@@ -56,7 +58,8 @@ export function SolanaDecentralized() {
             style={{ background: '#14F195' }}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, delay: 0.3 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3 }}
           >
             <h3 className="text-black text-[3rem] font-bold leading-tight">Register Track</h3>
           </motion.div>

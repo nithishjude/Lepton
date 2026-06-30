@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   IconLayoutDashboard, IconMusic, IconHierarchy, IconWallet,
   IconArrowsExchange, IconSettings, IconCoin, IconPlayerPlay,
-  IconPlayerPause, IconLogout, IconChevronRight,
+  IconPlayerPause, IconLogout, IconChevronRight, IconPlus,
 } from '@tabler/icons-react';
 import { usePlayback } from '../context/PlaybackContext';
 import { useDisconnect } from 'wagmi';
@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 const NAV = [
   { id: 'dashboard',    label: 'Dashboard',        icon: IconLayoutDashboard, href: '/dashboard', group: 'main' },
   { id: 'library',      label: 'Library',           icon: IconMusic,           href: '/library',   group: 'main' },
+  { id: 'upload',       label: 'Upload Music',      icon: IconPlus,            href: '/upload',    group: 'main' },
   { id: 'graph',        label: 'Provenance graph',  icon: IconHierarchy,       href: '/graph',     group: 'main' },
   { id: 'wallets',      label: 'Wallets',           icon: IconWallet,          href: '/wallets',   group: 'payments' },
   { id: 'transactions', label: 'Transactions',      icon: IconArrowsExchange,  href: '/transactions', group: 'payments' },
@@ -33,10 +34,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { trackTitle, trackArtist, isPlaying, elapsedSeconds, totalPaid, gateCleared, trackMbid, startTrack, stopTrack } = usePlayback();
 
-  const isBypass = typeof window !== 'undefined' && window.location.search.includes('bypass=true');
-  const finalAddress = address || (isBypass ? '0x8b3fca210b3fd0e3c881c19875411a01103c8810' : undefined);
-
-  const initials = finalAddress ? finalAddress.slice(2, 4).toUpperCase() : 'PP';
+  const initials = address ? address.slice(2, 4).toUpperCase() : 'PP';
   const groups = [
     { label: 'Main',     items: NAV.filter(n => n.group === 'main') },
     { label: 'Payments', items: NAV.filter(n => n.group === 'payments') },
@@ -105,14 +103,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-[11px] font-medium" style={{ color: 'var(--text-success)' }}>Arc testnet live</span>
           </div>
           {/* Wallet pill */}
-          {finalAddress && (
+          {address && (
             <div className="flex items-center justify-between px-3 py-2 rounded-[var(--radius)]" style={{ background: 'var(--surface-3)', border: '1px solid var(--border)' }}>
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold" style={{ background: 'linear-gradient(135deg, #00C2FF, #A89EFF)' }}>
                   {initials}
                 </div>
                 <span className="text-[11px] font-mono" style={{ color: 'var(--text-secondary)' }}>
-                  {finalAddress.slice(0, 6)}…{finalAddress.slice(-4)}
+                  {address.slice(0, 6)}…{address.slice(-4)}
                 </span>
               </div>
             </div>
@@ -146,12 +144,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <IconCoin size={11} />
               USDC · Arc Testnet
             </div>
-            {finalAddress && (
+            {address && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-mono" style={{ background: 'var(--surface-3)', border: '1px solid var(--border)' }}>
                 <div className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ background: 'linear-gradient(135deg, #00C2FF, #A89EFF)' }}>
                   {initials}
                 </div>
-                <span style={{ color: 'var(--text-secondary)' }}>{finalAddress.slice(0, 6)}…{finalAddress.slice(-4)}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{address.slice(0, 6)}…{address.slice(-4)}</span>
               </div>
             )}
             <button

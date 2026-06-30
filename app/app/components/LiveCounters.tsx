@@ -1,9 +1,9 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 
-export default function LiveCounters({ trackId, setGraph }) {
+export default function LiveCounters({ trackId, setGraph }: { trackId: string | null; setGraph: (graph: any) => void }) {
   const [gateStatus, setGateStatus] = useState('WAITING FOR PLAYBACK...');
-  const [balances, setBalances] = useState({});
+  const [balances, setBalances] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!trackId) return;

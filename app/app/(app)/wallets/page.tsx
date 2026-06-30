@@ -42,10 +42,10 @@ export default function WalletsPage() {
   }, []);
 
   // Get role from graph if available
-  const roleOf = (mbid: string) => graph?.nodes?.find((n: any) => n.mbid === mbid)?.role;
-  const splitOf = (mbid: string) => {
-    const s = graph?.splits?.find((s: any) => s.mbid === mbid);
-    return s ? `${((s.bps / 10000) * 100).toFixed(0)}%` : '—';
+  const roleOf = (c: Contributor) => c.role || graph?.nodes?.find((n: any) => n.mbid === c.mbid)?.role;
+  const splitOf = (c: Contributor) => {
+    const bps = c.bps || graph?.splits?.find((s: any) => s.mbid === c.mbid)?.bps;
+    return bps ? `${((bps / 10000) * 100).toFixed(1)}%` : '—';
   };
 
   return (
@@ -58,7 +58,7 @@ export default function WalletsPage() {
         </div>
       )}
       {contributors.map((c, i) => {
-        const role = roleOf(c.mbid);
+        const role = roleOf(c);
         const badge = ROLE_BADGES[role || ''];
         const liveAmt = live[c.mbid]?.amount;
         const displayEarned = liveAmt
@@ -77,7 +77,7 @@ export default function WalletsPage() {
               <div className="flex-1 min-w-0">
                 <div className="text-[14px] font-medium text-[var(--text-primary)]">{c.name || c.mbid.slice(0,8)}</div>
                 <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                  {role ? `${role.replace('_', ' ')} — receives ${splitOf(c.mbid)} of every play` : `Contributor · MBID ${c.mbid.slice(0,8)}`}
+                  {role ? `${role.replace('_', ' ')} — receives ${splitOf(c)} of every play` : `Contributor · MBID ${c.mbid.slice(0,8)}`}
                 </div>
               </div>
               {badge && (
@@ -98,7 +98,7 @@ export default function WalletsPage() {
                 <div className="text-[10px] text-[var(--text-muted)] mt-0.5">{c.is_escrow ? 'Held in escrow' : 'Total earned'}</div>
               </div>
               <div className="bg-[var(--surface-1)] rounded-[var(--radius)] p-2">
-                <div className="text-[14px] font-medium text-[var(--text-primary)]">{splitOf(c.mbid)}</div>
+                <div className="text-[14px] font-medium text-[var(--text-primary)]">{splitOf(c)}</div>
                 <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Split</div>
               </div>
               <div className="bg-[var(--surface-1)] rounded-[var(--radius)] p-2">

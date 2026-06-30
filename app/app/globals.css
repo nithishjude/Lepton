@@ -214,3 +214,35 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ────── Space/Premium Landing Page Custom Styles ────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', var(--font-sans);
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 194, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(153, 69, 255, 0.5);
+  }
+}
+
+.animate-glow {
+  animation: glow 3s ease-in-out infinite;
+}
+

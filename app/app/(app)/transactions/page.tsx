@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 interface Tx {
   id: string; contributor_name: string; wallet_address: string;
-  amount_usdc: string; nanopay_ref: string; tick_at: string;
+  amount_usdc: string; nanopay_ref: string; arc_batch_hash?: string; tick_at: string;
   is_escrow: number; track_mbid: string;
 }
 
@@ -56,8 +56,20 @@ export default function TransactionsPage() {
             {tx.is_escrow ? 'Escrow hold' : 'Batch payout'} → {tx.contributor_name || '?'}
             {tx.wallet_address ? ` (${tx.wallet_address.slice(0, 6)}…${tx.wallet_address.slice(-4)})` : ''}
           </span>
-          <span className="text-[11px] text-[var(--text-muted)] font-mono truncate max-w-[180px]" title={tx.nanopay_ref}>
-            {tx.nanopay_ref ? tx.nanopay_ref.slice(0, 16) : 'n/a'}…
+          <span className="text-[11px] text-[var(--text-muted)] font-mono truncate max-w-[180px]">
+            {tx.arc_batch_hash || tx.nanopay_ref ? (
+              <a
+                href={`https://testnet.arcscan.app/tx/${tx.arc_batch_hash || tx.nanopay_ref}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--text-accent)] hover:underline"
+                title={tx.arc_batch_hash || tx.nanopay_ref}
+              >
+                {(tx.arc_batch_hash || tx.nanopay_ref).slice(0, 16)}…
+              </a>
+            ) : (
+              'n/a'
+            )}
           </span>
           <span className="text-[12px] font-medium text-[var(--text-primary)] whitespace-nowrap">${parseFloat(tx.amount_usdc).toFixed(6)}</span>
           <span className="text-[11px] text-[var(--text-muted)] min-w-[44px] text-right">{relTime(tx.tick_at)}</span>

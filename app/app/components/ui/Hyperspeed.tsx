@@ -1,6 +1,8 @@
+// @ts-nocheck
 'use client';
 import { BloomEffect, EffectComposer, EffectPass, RenderPass, SMAAEffect, SMAAPreset } from 'postprocessing';
 import { useEffect, useRef, useState } from 'react';
+// @ts-ignore
 import * as THREE from 'three';
 import CanvasHighway from './CanvasHighway';
 

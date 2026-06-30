@@ -5,7 +5,7 @@ import { usePlayback } from '../../context/PlaybackContext';
 
 interface Metrics { totalPaid: string; txCount: number; contributorCount: number; escrowCount: number; trackCount: number; }
 interface TopTrack { mbid: string; title: string; artist: string; totalEarned: string; tickCount: number; }
-interface Tx { id: string; contributor_name: string; wallet_address: string; amount_usdc: string; nanopay_ref: string; tick_at: string; is_escrow: number; track_mbid: string; }
+interface Tx { id: string; contributor_name: string; wallet_address: string; amount_usdc: string; nanopay_ref: string; arc_batch_hash?: string; tick_at: string; is_escrow: number; track_mbid: string; }
 interface Split { mbid: string; name: string; wallet_address: string; total_earned: string; is_escrow: number; tx_count: number; }
 
 const SIDECAR = 'http://localhost:3001';
@@ -64,6 +64,7 @@ function MetricCard({ value, label, sub, subColor, color, icon: Icon, delay, typ
 }
 
 function TxRow({ tx, idx }: { tx: Tx; idx: number }) {
+  const linkHash = tx.arc_batch_hash || tx.nanopay_ref;
   return (
     <div
       className="flex items-center gap-3 py-2.5 border-b last:border-0 animate-slide-right"
@@ -74,7 +75,20 @@ function TxRow({ tx, idx }: { tx: Tx; idx: number }) {
         boxShadow: tx.is_escrow ? '0 0 6px rgba(245,158,11,0.5)' : parseFloat(tx.amount_usdc) > 0 ? '0 0 6px rgba(52,211,153,0.4)' : 'none',
       }} />
       <span className="flex-1 text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>
-        {tx.is_escrow ? 'Escrow' : 'Batch'} → <span style={{ color: 'var(--text-primary)' }}>{tx.contributor_name || tx.track_mbid?.slice(0,8)}</span>
+        {linkHash ? (
+          <a
+            href={`https://testnet.arcscan.app/tx/${linkHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--text-accent)] hover:underline font-semibold"
+            title="Verify transaction on block explorer"
+          >
+            {tx.is_escrow ? 'Escrow' : 'Batch'}
+          </a>
+        ) : (
+          tx.is_escrow ? 'Escrow' : 'Batch'
+        )}
+        → <span style={{ color: 'var(--text-primary)' }}>{tx.contributor_name || tx.track_mbid?.slice(0,8)}</span>
         {tx.wallet_address ? <span className="font-mono text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>({tx.wallet_address.slice(0,6)}…)</span> : ''}
       </span>
       <span className="text-[12px] font-mono font-semibold" style={{ color: tx.is_escrow ? 'var(--text-warning)' : 'var(--text-success)' }}>

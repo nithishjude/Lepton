@@ -26,6 +26,26 @@ contract ProvenanceRegistry {
     error InvalidSplits();
     error EmptyWallets();
 
+    struct Correction {
+        address[] wallets;
+        uint16[] bps;
+        string[] roles;
+        string reason;
+        uint256 timestamp;
+    }
+
+    // bytes32-encoded MBID -> array of corrections proposed
+    mapping(bytes32 => Correction[]) private _corrections;
+
+    event CorrectionProposed(
+        bytes32 indexed mbid,
+        address[] wallets,
+        uint16[] bps,
+        string[] roles,
+        string reason,
+        uint256 timestamp
+    );
+
     /// @notice Register an immutable royalty split for a recording. Write-once per MBID.
     /// @param mbid          bytes32-encoded MusicBrainz Recording ID (UTF-8, left-padded)
     /// @param wallets       contributor wallet addresses
@@ -52,6 +72,35 @@ contract ProvenanceRegistry {
         emit ProvenanceRegistered(mbid, wallets, bps, roles);
     }
 
+    /// @notice Propose a correction to an existing registered split.
+    function proposeCorrection(
+        bytes32 mbid,
+        address[] calldata newWallets,
+        uint16[] calldata newBps,
+        string[] calldata newRoles,
+        string calldata reason
+    ) external {
+        if (!_registered[mbid])          revert InvalidSplits();
+        if (newWallets.length == 0)      revert EmptyWallets();
+        if (newWallets.length != newBps.length || newWallets.length != newRoles.length) revert InvalidSplits();
+
+        uint16 total;
+        for (uint256 i; i < newBps.length; i++) {
+            total += newBps[i];
+        }
+        if (total != 10000) revert InvalidSplits();
+
+        _corrections[mbid].push(Correction({
+            wallets: newWallets,
+            bps: newBps,
+            roles: newRoles,
+            reason: reason,
+            timestamp: block.timestamp
+        }));
+
+        emit CorrectionProposed(mbid, newWallets, newBps, newRoles, reason, block.timestamp);
+    }
+
     /// @notice Returns all splits for a registered MBID.
     function getSplits(bytes32 mbid) external view returns (Split[] memory) {
         return _registry[mbid];
@@ -60,5 +109,22 @@ contract ProvenanceRegistry {
     /// @notice Returns true if the MBID has a registered split.
     function isRegistered(bytes32 mbid) external view returns (bool) {
         return _registered[mbid];
+    }
+
+    /// @notice Returns count of proposed corrections.
+    function getCorrectionsCount(bytes32 mbid) external view returns (uint256) {
+        return _corrections[mbid].length;
+    }
+
+    /// @notice Returns details of a specific correction.
+    function getCorrection(bytes32 mbid, uint256 index) external view returns (
+        address[] memory wallets,
+        uint16[] memory bps,
+        string[] memory roles,
+        string memory reason,
+        uint256 timestamp
+    ) {
+        Correction storage c = _corrections[mbid][index];
+        return (c.wallets, c.bps, c.roles, c.reason, c.timestamp);
     }
 }

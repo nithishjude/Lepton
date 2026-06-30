@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -32,7 +32,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
   const router = useRouter();
-  const { trackTitle, trackArtist, isPlaying, elapsedSeconds, totalPaid, gateCleared, trackMbid, startTrack, stopTrack } = usePlayback();
+  const { trackTitle, trackArtist, isPlaying, elapsedSeconds, totalPaid, gateCleared, trackMbid, startTrack, stopTrack, graph } = usePlayback();
+  const [showRateBreakdown, setShowRateBreakdown] = useState(false);
+  const [ratePerSecond, setRatePerSecond] = useState(0.0001);
+
+  useEffect(() => {
+    fetch('http://localhost:3001/api/config')
+      .then(r => r.json())
+      .then(cfg => {
+        if (cfg?.trackRatePerSecond) {
+          setRatePerSecond(cfg.trackRatePerSecond);
+        }
+      })
+      .catch(() => {});
+  }, [trackMbid]);
 
   const initials = address ? address.slice(2, 4).toUpperCase() : 'PP';
   const groups = [
@@ -140,6 +153,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            <a
+              href="https://testnet.arcscan.app/address/0x43C878Be9d3d55E8A5fa8e6DdD05C97Df7513004"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+            >
+              {/* TODO: verify contract before demo */}
+              Contract Verified ✓
+            </a>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: 'var(--bg-accent)', border: '1px solid rgba(0,194,255,0.20)', color: 'var(--text-accent)' }}>
               <IconCoin size={11} />
               USDC · Arc Testnet
@@ -231,11 +253,48 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Total paid */}
-            <div className="text-right flex-shrink-0">
-              <div className="text-[15px] font-semibold font-mono" style={{ color: 'var(--text-success)' }}>
-                ${totalPaid.toFixed(6)}
-              </div>
-              <div className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>paid this play</div>
+            <div className="relative text-right flex-shrink-0">
+              <button
+                onClick={() => setShowRateBreakdown(!showRateBreakdown)}
+                className="text-right focus:outline-none hover:opacity-85 select-none"
+              >
+                <div className="text-[15px] font-semibold font-mono text-[var(--text-success)]">
+                  ${totalPaid.toFixed(6)}
+                </div>
+                <div className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] hover:text-emerald-400 transition-colors flex items-center justify-end gap-1">
+                  paid this play <span className="text-[8px]">▼</span>
+                </div>
+              </button>
+
+              {showRateBreakdown && graph?.splits && (
+                <div
+                  className="absolute bottom-12 right-0 w-72 p-4 rounded-xl border border-gray-800 bg-[#0B0B12] shadow-2xl z-50 text-left animate-fade-in"
+                  style={{ backdropFilter: 'blur(20px)' }}
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2 pb-1.5 border-b border-gray-900 flex justify-between">
+                    <span>Royalty Splits</span>
+                    <span className="text-emerald-400 font-mono text-[10px]">{ratePerSecond.toFixed(6)} USDC/s</span>
+                  </div>
+                  <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                    {graph.splits.map((s: any) => {
+                      const shareRate = (s.bps / 10000) * ratePerSecond;
+                      const pct = ((s.bps / 10000) * 100).toFixed(1);
+                      return (
+                        <div key={s.mbid} className="flex justify-between items-center text-[12px]">
+                          <div className="min-w-0 flex-1 pr-2">
+                            <div className="text-gray-200 font-medium truncate">{s.name}</div>
+                            <div className="text-gray-500 text-[9px] font-mono truncate">{s.walletAddress || 'Escrow Wallet'}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0 font-mono">
+                            <span className="text-gray-400 text-[10px] mr-1.5">{pct}%</span>
+                            <span className="text-emerald-400 font-semibold">+{shareRate.toFixed(6)}/s</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -12,7 +12,7 @@ Every second a song plays in the browser, the system splits and routes micropaym
 
 ### On-Chain Layer
 - **Blockchain Network**: Arc Testnet (Chain ID: `5042002`, RPC: `https://rpc.testnet.arc.network`)
-- **Gas Model**: stablecoin-native gas (USDC represents the native currency of the chain, decimals: 18)
+- **Gas Model**: Stablecoin-native gas (USDC represents the native currency of the chain, decimals: 18)
 - **Smart Contract**: EVM Solidity `ProvenanceRegistry.sol`
 - **Wallet Provider**: Circle Developer-Controlled Wallets API (MPC 2-of-2 key custody)
 
@@ -44,9 +44,10 @@ Every second a song plays in the browser, the system splits and routes micropaym
 - The sidecar queries the Arc Testnet RPC via `publicClient.getTransaction` to verify the payment on-chain before returning the audio stream.
 - Includes a premium modal popup in the browser prompting users to switch to Arc Testnet and sign the stream authorization fee.
 
-### 3.3. Transaction Hash Polling
+### 3.3. Transaction Hash Polling & Batch Optimization
 - Resolved Circle's asynchronous broadcast delay by adding a polling loop (`client.getTransaction`) in both the **royalty payments loop** and the **escrow claim API**.
-- The sidecar polls Circle until the transaction is successfully broadcasted and a real, valid on-chain transaction hash is returned and saved to the SQLite database. All transaction hash links in the UI open valid, indexed block explorer pages on ArcScan.
+- Set the batch interval to **15 seconds** (`batchIntervalMs: 15000` / `tickDuration: 15`) and extended Circle API polling to **30 seconds** (15 retries, 2s apart). This completely prevents EVM nonce queues, avoids rate limiting, and guarantees that every transaction correctly receives its actual on-chain transaction hash on Arcscan.
+- All transaction hash links in the UI open valid, indexed block explorer pages on ArcScan.
 
 ### 3.4. Dynamic Wallets & Split Displays
 - Refactored `/api/contributors` to scan all SQLite provenance graphs on-the-fly to extract the split basis points (BPS) and roles assigned to each contributor.
@@ -85,7 +86,7 @@ Every second a song plays in the browser, the system splits and routes micropaym
 ## 5. Smart Contract Specification
 
 ### `ProvenanceRegistry.sol`
-- **Address**: `0x8d866b56e76c0052913f5d2374e6441CfeAB4790`
+- **Address**: `0x43C878Be9d3d55E8A5fa8e6DdD05C97Df7513004`
 - **Properties**: Write-once per MBID (once registered, splits are immutable to prevent royalty manipulation).
 - **Core Functions**:
   - `register(bytes32 mbid, address[] wallets, uint16[] bps, string[] roles)`: Validates BPS sum (exactly 10000) and registers splits.

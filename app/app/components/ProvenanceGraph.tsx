@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-export default function ProvenanceGraph({ graph }: { graph: any }) {
+export default function ProvenanceGraph({ graph, isPlaying }: { graph: any; isPlaying?: boolean }) {
   const svgRef = useRef(null);
 
   useEffect(() => {
@@ -66,6 +66,34 @@ export default function ProvenanceGraph({ graph }: { graph: any }) {
         .attr('transform', (d: any) => `translate(${d.x},${d.y})`);
     });
 
+    // Real-Time Money Flow Particles
+    let particleInterval: any;
+    if (isPlaying) {
+      particleInterval = setInterval(() => {
+        graph.edges.forEach((edge: any) => {
+          if (!edge.source || !edge.target) return;
+          // Spawn USDC particle at the track node (target)
+          const particle = svg.append('circle')
+            .attr('r', 4.5)
+            .attr('fill', '#00C2FF')
+            .attr('cx', edge.target.x)
+            .attr('cy', edge.target.y)
+            .attr('opacity', 0.9)
+            .style('filter', 'drop-shadow(0px 0px 4px #00C2FF)');
+
+          // Transition the particle along the edge to the contributor node (source)
+          particle.transition()
+            .duration(1200)
+            .ease(d3.easeQuadOut)
+            .attr('cx', edge.source.x)
+            .attr('cy', edge.source.y)
+            .attr('r', 2)
+            .attr('opacity', 0)
+            .remove();
+        });
+      }, 1500);
+    }
+
     function dragstarted(event: any) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       event.subject.fx = event.subject.x;
@@ -85,8 +113,9 @@ export default function ProvenanceGraph({ graph }: { graph: any }) {
 
     return () => {
       simulation.stop();
+      if (particleInterval) clearInterval(particleInterval);
     };
-  }, [graph]);
+  }, [graph, isPlaying]);
 
   return <svg ref={svgRef} className="w-full h-full min-h-[400px]"></svg>;
 }

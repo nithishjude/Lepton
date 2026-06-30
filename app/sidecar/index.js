@@ -65,6 +65,46 @@ const provenanceRegistryAbi = [
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "mbid", "type": "bytes32" },
+      { "internalType": "address[]", "name": "newWallets", "type": "address[]" },
+      { "internalType": "uint16[]", "name": "newBps", "type": "uint16[]" },
+      { "internalType": "string[]", "name": "newRoles", "type": "string[]" },
+      { "internalType": "string", "name": "reason", "type": "string" }
+    ],
+    "name": "proposeCorrection",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "mbid", "type": "bytes32" }
+    ],
+    "name": "getCorrectionsCount",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "mbid", "type": "bytes32" },
+      { "internalType": "uint256", "name": "index", "type": "uint256" }
+    ],
+    "name": "getCorrection",
+    "outputs": [
+      { "internalType": "address[]", "name": "wallets", "type": "address[]" },
+      { "internalType": "uint16[]", "name": "bps", "type": "uint16[]" },
+      { "internalType": "string[]", "name": "roles", "type": "string[]" },
+      { "internalType": "string", "name": "reason", "type": "string" },
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   }
 ];
 
@@ -85,7 +125,7 @@ let currentGraph = null;
 let sidecarConfig = {
   playGateMs: 15000,           // ms before payments start after play
   trackRatePerSecond: 0.0001,  // USDC per second of playback
-  batchIntervalMs: 2000,       // payment dispatch interval in ms
+  batchIntervalMs: 15000,       // payment dispatch interval in ms
   autoProvisionWallets: true,  // auto-create Circle wallets for unknown artists
   beetsMetadataSync: true,     // read Beets MBID tags
   musicbrainzLookup: true,     // query MusicBrainz REST API
@@ -494,7 +534,8 @@ app.post('/api/config', (req, res) => {
 app.get('/api/transactions', (req, res) => {
   const limit = parseInt(req.query.limit) || 30;
   const rows = db.prepare(`
-    SELECT t.id, t.track_mbid, t.contributor_mbid, t.amount_usdc, t.nanopay_ref, t.arc_batch_hash, t.tick_at,
+    SELECT t.id, t.track_mbid, t.contributor_mbid, t.amount_usdc, t.nanopay_ref, t.arc_batch_hash,
+           strftime('%Y-%m-%dT%H:%M:%SZ', t.tick_at) as tick_at,
            c.name as contributor_name, c.wallet_address, c.is_escrow
     FROM payment_ticks t
     LEFT JOIN contributors c ON t.contributor_mbid = c.mbid
@@ -679,6 +720,118 @@ app.post('/api/claim', async (req, res) => {
     });
   } catch (err) {
     console.error('[Claim API] Error claiming escrow:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/correction', async (req, res) => {
+  const { mbid, splits, reason } = req.body;
+  if (!mbid || !splits || !splits.length || !reason) {
+    return res.status(400).json({ error: 'Missing mbid, splits, or reason' });
+  }
+
+  try {
+    const hexMbid = pad(stringToHex(mbid, { size: 32 }), { size: 32, dir: 'right' });
+    const wallets = splits.map(s => s.walletAddress);
+    const bps = splits.map(s => parseInt(s.bps));
+    const roles = splits.map(s => s.role);
+
+    console.log('[Correction API] Simulating proposeCorrection on-chain...');
+    let onChainTxHash = null;
+
+    if (walletClient) {
+      const { request } = await publicClient.simulateContract({
+        address: PROVENANCE_REGISTRY_ADDRESS,
+        abi: provenanceRegistryAbi,
+        functionName: 'proposeCorrection',
+        args: [hexMbid, wallets, bps, roles, reason],
+        account
+      });
+
+      console.log('[Correction API] Submitting proposeCorrection to Arc Testnet...');
+      onChainTxHash = await walletClient.writeContract(request);
+      await publicClient.waitForTransactionReceipt({ hash: onChainTxHash });
+      console.log('[Correction API] ProposeCorrection confirmed.');
+    }
+
+    const correctionIdStr = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+
+    db.prepare(`
+      INSERT INTO corrections (id, track_mbid, correction_json, arc_tx_hash, reason)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(correctionIdStr, mbid, JSON.stringify(splits), onChainTxHash || '', reason);
+
+    res.json({
+      success: true,
+      onChainTxHash,
+      id: correctionIdStr
+    });
+  } catch (err) {
+    console.error('[Correction API] Error proposing correction:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/track/:mbid/corrections', (req, res) => {
+  const { mbid } = req.params;
+  try {
+    const rows = db.prepare(`
+      SELECT id, track_mbid, correction_json, arc_tx_hash, reason,
+             strftime('%Y-%m-%dT%H:%M:%SZ', created_at) as created_at
+      FROM corrections
+      WHERE track_mbid = ?
+      ORDER BY created_at DESC
+    `).all(mbid);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/contributor/:walletOrMbid', (req, res) => {
+  const { walletOrMbid } = req.params;
+  try {
+    const contrib = db.prepare(`
+      SELECT mbid, name, wallet_address, wallet_id, is_escrow, is_provisioned,
+             (SELECT COALESCE(SUM(amount_usdc), 0) FROM payment_ticks WHERE contributor_mbid = c.mbid) as total_earned,
+             (SELECT COUNT(DISTINCT nanopay_ref) FROM payment_ticks WHERE contributor_mbid = c.mbid) as tx_count
+      FROM contributors c
+      WHERE c.wallet_address = ? OR c.mbid = ?
+    `).get(walletOrMbid, walletOrMbid);
+
+    if (!contrib) {
+      return res.status(404).json({ error: 'Contributor not found' });
+    }
+
+    const allGraphs = db.prepare('SELECT mbid, graph_json FROM provenance_graphs').all();
+    const tracks = [];
+    for (const g of allGraphs) {
+      const graph = JSON.parse(g.graph_json);
+      const split = graph.splits?.find(s => s.mbid === contrib.mbid || s.walletAddress?.toLowerCase() === contrib.wallet_address?.toLowerCase());
+      if (split) {
+        tracks.push({
+          mbid: g.mbid,
+          title: graph.title,
+          artist: graph.artist,
+          bps: split.bps,
+          role: graph.nodes?.find(n => n.mbid === contrib.mbid)?.role || 'contributor'
+        });
+      }
+    }
+
+    const ticks = db.prepare(`
+      SELECT amount_usdc, strftime('%Y-%m-%dT%H:%M:%SZ', tick_at) as tick_at
+      FROM payment_ticks
+      WHERE contributor_mbid = ?
+      ORDER BY tick_at ASC
+    `).all(contrib.mbid);
+
+    res.json({
+      contributor: contrib,
+      tracks,
+      ticks
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

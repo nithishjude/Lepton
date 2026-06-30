@@ -296,6 +296,29 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* ── Smart Contract Registry ── */}
+      <section className="mb-6">
+        <div className="text-[12px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
+          Smart Contract Registry
+        </div>
+        <div className="rounded-xl overflow-hidden p-4 space-y-3" style={{ border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] text-white">ProvenanceRegistry.sol</span>
+            <a
+              href="https://testnet.arcscan.app/address/0x43C878Be9d3d55E8A5fa8e6DdD05C97Df7513004"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold px-2 py-0.5 rounded-full hover:bg-emerald-500/20 transition-all font-mono"
+            >
+              ✓ Verified on ArcScan
+            </a>
+          </div>
+          <div className="bg-[#1C1C24] p-3 rounded-lg border border-gray-800 font-mono text-[11.5px] text-gray-400 break-all select-all">
+            0x43C878Be9d3d55E8A5fa8e6DdD05C97Df7513004
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 }

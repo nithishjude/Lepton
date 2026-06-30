@@ -31,7 +31,7 @@ export class PaymentDispatcher {
   }
 
   async dispatchTick(graph, trackRatePerSecond) {
-    const tickDuration = 2; // seconds
+    const tickDuration = 15; // seconds
     const totalTickAmount = trackRatePerSecond * tickDuration;
 
     const confirmations = [];
@@ -104,10 +104,10 @@ export class PaymentDispatcher {
           let txHash = txRes.data.txHash;
           
           // Poll for real on-chain transaction hash from Circle
-          let retries = 8;
+          let retries = 15;
           while (!txHash && retries > 0) {
             console.log(`[Nanopay] Transaction ${txId} is pending on-chain broadcast. Polling...`);
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 2000));
             try {
               const checkRes = await client.getTransaction({ id: txId });
               txHash = checkRes.data?.transaction?.txHash;

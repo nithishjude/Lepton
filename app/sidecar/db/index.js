@@ -41,6 +41,15 @@ db.exec(`
     arc_batch_hash TEXT,
     tick_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS corrections (
+    id TEXT PRIMARY KEY,
+    track_mbid TEXT NOT NULL,
+    correction_json TEXT NOT NULL,
+    arc_tx_hash TEXT,
+    reason TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 console.log('[DB] Seeding default tracks...');

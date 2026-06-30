@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { WagmiProvider, createConfig, http } from 'wagmi';
-import { metaMask, injected } from 'wagmi/connectors';
+import { injected } from 'wagmi/connectors';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import type { Chain } from 'wagmi/chains';
 
@@ -21,12 +21,6 @@ const arcTestnet = {
 
 const config = createConfig({
   connectors: [
-    metaMask({
-      dappMetadata: {
-        name: 'Provenance Pay',
-        url: 'http://localhost:3000',
-      },
-    }),
     injected(),
   ],
   chains: [arcTestnet],
